@@ -1,0 +1,758 @@
+---
+title: "Análise Atividade Econômica Brasileira"
+author: "Produção Industrial, Índice de Serviços e Índice de Comércio"
+date: '2023-01-27'
+output: 
+  pdf_document:
+    
+    number_sections: true
+    
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 6pt
+
+---
+
+Gráficos em Série Temporal:
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+library(sidrar)
+library(ggplot2)
+library(magrittr)
+library(scales)
+library(sidrar)
+library(sidrar)
+library(sidrar)
+library(GetBCBData)
+library(gridExtra)
+library(ggcorrplot)
+library(stats)
+library(tseries)
+library(tsibble)
+
+```
+
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+pim_ibge = sidrar::get_sidra(api = '/t/8159/n1/all/v/11599/p/last%2010/c544/all/d/v11599%205')
+
+pim_ibge = pim_ibge%>%
+  dplyr::mutate(mes = paste0(substr(pim_ibge$`Mês (Código)`, nchar(pim_ibge[1, 10])-5, nchar(pim_ibge[1, 10])-2),'-', substr(pim_ibge$`Mês (Código)`, nchar(pim_ibge[1, 10])-1, nchar(pim_ibge[1, 10])),'-', '01'))
+  
+pim_ibge$mes = as.Date(pim_ibge$mes)
+  
+pim_geral = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '1 Indústria geral')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_extrativa = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '2 Indústrias extrativas')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_transformacao = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3 Indústrias de transformação')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_alimentos = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.10 Fabricação de produtos alimentícios')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_bebidas = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.11 Fabricação de bebidas')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_fumo = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.12 Fabricação de produtos do fumo')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_texteis = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.13 Fabricação de produtos têxteis')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_vestuario = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.14 Confecção de artigos do vestuário e acessórios')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_couros = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.15 Preparação de couros e fabricação de artefatos de couro, artigos para viagem e calçados')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_madeira = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.16 Fabricação de produtos de madeira')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_celulose = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.17 Fabricação de celulose, papel e produtos de papel')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_gravacoes = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.18 Impressão e reprodução de gravações')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_derivadospetroleo = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.19 Fabricação de coque, de produtos derivados do petróleo e de biocombustíveis')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_saboes = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.20B Fabricação de sabões, detergentes, produtos de limpeza, cosméticos, produtos de perfumaria e de higiene pessoal')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_produtosquimicos = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.20C Fabricação de outros produtos químicos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_farmoquimicos = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.21 Fabricação de produtos farmoquímicos e farmacêuticos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_borracha = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.22 Fabricação de produtos de borracha e de material plástico')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_minerais = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.23 Fabricação de produtos de minerais não metálicos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_metalurgia = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.24 Metalurgia')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_metal = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.25 Fabricação de produtos de metal, exceto máquinas e equipamentos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_informatica = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.26 Fabricação de equipamentos de informática, produtos eletrônicos e ópticos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_materiaiseletricos = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.27 Fabricação de máquinas, aparelhos e materiais elétricos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_maquinas = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.28 Fabricação de máquinas e equipamentos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_veiculos = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.29 Fabricação de veículos automotores, reboques e carrocerias')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_equipamentostransporte = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.30 Fabricação de outros equipamentos de transporte, exceto veículos automotores')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_moveis = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.31 Fabricação de móveis')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_produtosdiversos = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.32 Fabricação de produtos diversos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+pim_manutencao = pim_ibge%>%
+  dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.33 Manutenção, reparação e instalação de máquinas e equipamentos')%>%
+  dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)
+  
+a1 = ggplot(pim_geral, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Geral', x = '', y = '')+theme_light()
+a2 = ggplot(pim_extrativa, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Extrativa', x = '', y = '')+theme_light()
+a3 = ggplot(pim_transformacao, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Transformacao', x = '', y = '')+theme_light()
+a4 = ggplot(pim_alimentos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Alimentos', x = '', y = '')+theme_light()
+a5 = ggplot(pim_bebidas, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Bebidas', x = '', y = '')+theme_light()
+a6 = ggplot(pim_fumo, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Fumo', x = '', y = '')+theme_light()
+a7 = ggplot(pim_texteis, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Texteis', x = '', y = '')+theme_light()
+a8 = ggplot(pim_vestuario, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Vestuario', x = '', y = '')+theme_light()
+a9 = ggplot(pim_couros, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Couros', x = '', y = '')+theme_light()
+a10 = ggplot(pim_madeira, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Madeira', x = '', y = '')+theme_light()
+a11 = ggplot(pim_celulose, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Celulose', x = '', y = '')+theme_light()
+a12 = ggplot(pim_gravacoes, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Gravacoes', x = '', y = '')+theme_light()
+a13 = ggplot(pim_derivadospetroleo, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Derivadospetroleo', x = '', y = '')+theme_light()
+a14 = ggplot(pim_saboes, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Saboes', x = '', y = '')+theme_light()
+a15 = ggplot(pim_produtosquimicos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Produtosquimicos', x = '', y = '')+theme_light()
+a16 = ggplot(pim_farmoquimicos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Farmoquimicos', x = '', y = '')+theme_light()
+a17 = ggplot(pim_borracha, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Borracha', x = '', y = '')+theme_light()
+a18 = ggplot(pim_minerais, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Minerais', x = '', y = '')+theme_light()
+a19 = ggplot(pim_metalurgia, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Metalurgia', x = '', y = '')+theme_light()
+a20 = ggplot(pim_metal, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Metal', x = '', y = '')+theme_light()
+a21 = ggplot(pim_informatica, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Informatica', x = '', y = '')+theme_light()
+a22 = ggplot(pim_materiaiseletricos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'materiaiseletricos', x = '', y = '')+theme_light()
+a23 = ggplot(pim_maquinas, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'maquinas', x = '', y = '')+theme_light()
+a24 = ggplot(pim_veiculos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'veiculos', x = '', y = '')+theme_light()
+a25 = ggplot(pim_equipamentostransporte, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'equipamentostransporte', x = '', y = '')+theme_light()
+a26 = ggplot(pim_moveis, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'moveis', x = '', y = '')+theme_light()
+a27 = ggplot(pim_produtosdiversos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'produtosdiversos', x = '', y = '')+theme_light()
+a28 = ggplot(pim_manutencao, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'manutencao', x = '', y = '')+theme_light()
+  
+graficos_a_1 = gridExtra::grid.arrange(a1,a2,a3,a4,a5,a6, nrow = 2, ncol = 3)
+
+graficos_a_2 = gridExtra::grid.arrange(a7,a8,a9,a10,a11,a12, nrow = 2, ncol = 3)
+
+graficos_a_3 = gridExtra::grid.arrange(a13,a14,a15,a16,a17,a18, nrow = 2, ncol = 3)
+
+graficos_a_4 = gridExtra::grid.arrange(a19,a20,a21,a22,a23,a24, nrow = 2, ncol = 3)
+
+graficos_a_5 = gridExtra::grid.arrange(a25,a26,a27,a28, nrow = 2, ncol = 2)
+
+```
+
+Gráficos de Dispersão (vs Selic):
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+selic = GetBCBData::gbcbd_get_series(id = 4390, use.memoise = F)%>%
+  as.data.frame()%>%
+  dplyr::filter(ref.date < '2022-11-01')%>%
+  dplyr::filter(ref.date > '2021-12-01')%>%
+  dplyr::select(value)%>%
+  dplyr::rename(selic = value)
+    
+  pim_geral = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '1 Indústria geral')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_extrativa = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '2 Indústrias extrativas')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_transformacao = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3 Indústrias de transformação')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_alimentos = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.10 Fabricação de produtos alimentícios')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_bebidas = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.11 Fabricação de bebidas')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_fumo = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.12 Fabricação de produtos do fumo')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_texteis = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.13 Fabricação de produtos têxteis')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_vestuario = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.14 Confecção de artigos do vestuário e acessórios')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_couros = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.15 Preparação de couros e fabricação de artefatos de couro, artigos para viagem e calçados')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_madeira = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.16 Fabricação de produtos de madeira')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_celulose = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.17 Fabricação de celulose, papel e produtos de papel')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_gravacoes = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.18 Impressão e reprodução de gravações')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_derivadospetroleo = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.19 Fabricação de coque, de produtos derivados do petróleo e de biocombustíveis')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_saboes = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.20B Fabricação de sabões, detergentes, produtos de limpeza, cosméticos, produtos de perfumaria e de higiene pessoal')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_produtosquimicos = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.20C Fabricação de outros produtos químicos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_farmoquimicos = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.21 Fabricação de produtos farmoquímicos e farmacêuticos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_borracha = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.22 Fabricação de produtos de borracha e de material plástico')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_minerais = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.23 Fabricação de produtos de minerais não metálicos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_metalurgia = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.24 Metalurgia')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_metal = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.25 Fabricação de produtos de metal, exceto máquinas e equipamentos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_informatica = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.26 Fabricação de equipamentos de informática, produtos eletrônicos e ópticos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_materiaiseletricos = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.27 Fabricação de máquinas, aparelhos e materiais elétricos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_maquinas = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.28 Fabricação de máquinas e equipamentos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_veiculos = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.29 Fabricação de veículos automotores, reboques e carrocerias')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_equipamentostransporte = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.30 Fabricação de outros equipamentos de transporte, exceto veículos automotores')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_moveis = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.31 Fabricação de móveis')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_produtosdiversos = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.32 Fabricação de produtos diversos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  pim_manutencao = pim_ibge%>%
+    dplyr::filter(pim_ibge$`Seções e atividades industriais (CNAE 2.0)` == '3.33 Manutenção, reparação e instalação de máquinas e equipamentos')%>%
+    dplyr::select(Valor, `Seções e atividades industriais (CNAE 2.0)`, mes)%>%
+    cbind(selic)
+  
+  
+  
+  b1 = ggplot(pim_geral)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Indústria Geral', x = 'selic', y = '')+theme_light()
+  b2 = ggplot(pim_extrativa)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Extrativa', x = 'selic', y = '')+theme_light()
+  b3 = ggplot(pim_transformacao)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Transformacao', x = 'selic', y = '')+theme_light()
+  b4 = ggplot(pim_alimentos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Alimentos', x = 'selic', y = '')+theme_light()
+  b5 = ggplot(pim_bebidas)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Bebidas', x = 'selic', y = '')+theme_light()
+  b6 = ggplot(pim_fumo)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Fumo', x = 'selic', y = '')+theme_light()
+  b7 = ggplot(pim_texteis)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Têxteis', x = 'selic', y = '')+theme_light()
+  b8 = ggplot(pim_vestuario)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Vestuário', x = 'selic', y = '')+theme_light()
+  b9 = ggplot(pim_couros)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Couros', x = 'selic', y = '')+theme_light()
+  b10 = ggplot(pim_madeira)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Madeira', x = 'selic', y = '')+theme_light()
+  b11 = ggplot(pim_celulose)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Celulose', x = 'selic', y = '')+theme_light()
+  b12 = ggplot(pim_gravacoes)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Gravações', x = 'selic', y = '')+theme_light()
+  b13 = ggplot(pim_derivadospetroleo)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Deriv Petróleo', x = 'selic', y = '')+theme_light()
+  b14 = ggplot(pim_saboes)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Sabões', x = 'selic', y = '')+theme_light()
+  b15 = ggplot(pim_produtosquimicos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Prod Químicos', x = 'selic', y = '')+theme_light()
+  b16 = ggplot(pim_farmoquimicos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Farmoquímicos', x = 'selic', y = '')+theme_light()
+  b17 = ggplot(pim_borracha)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Borracha', x = 'selic', y = '')+theme_light()
+  b18 = ggplot(pim_minerais)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Minerais', x = 'selic', y = '')+theme_light()
+  b19 = ggplot(pim_metalurgia)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Metalurgia', x = 'selic', y = '')+theme_light()
+  b20 = ggplot(pim_metal)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Metal', x = 'selic', y = '')+theme_light()
+  b21 = ggplot(pim_informatica)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Informática', x = 'selic', y = '')+theme_light()
+  b22 = ggplot(pim_materiaiseletricos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Mater Eletr', x = 'selic', y = '')+theme_light()
+  b23 = ggplot(pim_maquinas)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'MÃ¡quinas', x = 'selic', y = '')+theme_light()
+  b24 = ggplot(pim_veiculos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Veículos', x = 'selic', y = '')+theme_light()
+  b25 = ggplot(pim_equipamentostransporte)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Equip Transporte', x = 'selic', y = '')+theme_light()
+  b26 = ggplot(pim_moveis)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Móveis', x = 'selic', y = '')+theme_light()
+  b27 = ggplot(pim_produtosdiversos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Prod Diversos', x = 'selic', y = '')+theme_light()
+  b28 = ggplot(pim_manutencao, aes(x = mes))+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Manutencao', x = 'selic', y = '')+theme_light()
+  
+  
+graficos_b_1 = gridExtra::grid.arrange(b1,b2,b3,b4,b5,b6, nrow = 2, ncol = 3)
+
+graficos_b_2 = gridExtra::grid.arrange(b7,b8,b9,b10,b11,b12, nrow = 2, ncol = 3)
+
+graficos_b_3 = gridExtra::grid.arrange(b13,b14,b15,b16,b17,b18, nrow = 2, ncol = 3)
+
+graficos_b_4 = gridExtra::grid.arrange(b19,b20,b21,b22,b23,b24, nrow = 2, ncol = 3)
+
+graficos_b_5 = gridExtra::grid.arrange(b25,b26,b27,b28, nrow = 2, ncol = 2)
+
+```
+
+
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+pms_ibge = sidrar::get_sidra(api = '/t/8162/n1/all/v/11621/p/last%2010/c11046/56725/c12355/all/d/v11621%205')
+
+pms_ibge = pms_ibge%>%
+  dplyr::mutate(mes = paste0(substr(pms_ibge$`Mês (Código)`, nchar(pms_ibge[1, 10])-5, nchar(pms_ibge[1, 10])-2),'-', substr(pms_ibge$`Mês (Código)`, nchar(pms_ibge[1, 10])-1, nchar(pms_ibge[1, 10])),'-', '01'))
+  
+  #Ínndice e variação da receita nominal e do volume de serviços, por atividades de serviços e suas subdivisões
+  
+  pms_ibge$mes = as.Date(pms_ibge$mes)
+  
+  pms_total = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == 'Total')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_familias = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '1. Serviços prestados às famílias')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_alojamentoalimentacao = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '1.1 Serviços de alojamento e alimentação')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_outrosserviçosfamilias = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '1.2 Outros serviços prestados às famílias')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_informacaocomunicacao = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '2. Serviços de informação e comunicação')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_TIC = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '2.1 Serviços de Tecnologia de Informação e Comunicação (TIC)')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_telecomunicacoes = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '2.1.1 Telecomunicações')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_TI = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '2.1.2 Serviços de Tecnologia da Informação')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_audiovisual = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '2.2 Serviços audiovisuais, de edição e agências de notícias')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_admcomplementares = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '3. Serviços profissionais, administrativos e complementares')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_tecnicoprofissionais = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '3.1 Serviços técnico-profissionais')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_administrativoscomplementares = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '3.2 Serviços administrativos e complementares')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_transportes = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '4. Transportes, serviços auxiliares aos transportes e correio')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_transporteterrestre = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '4.1 Transporte terrestre')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_transporteaquaviario = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '4.2 Transporte aquaviário')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_transporteaereo = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '4.3 Transporte aéreo')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_armazenagemtransporte = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '4.4 Armazenagem, serviços auxiliares aos transportes e correio')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  pms_outrosservicos = pms_ibge%>%
+    dplyr::filter(pms_ibge$`Atividades de serviços` == '5. Outros serviços')%>%
+    dplyr::select(Valor, `Atividades de serviços`, mes)
+  
+  
+  c1 = ggplot(pms_total, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Total de Serviços', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c2 = ggplot(pms_familias, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Total de Serviços às famílias', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c3 = ggplot(pms_alojamentoalimentacao, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Alojamento e Alimentação', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c4 = ggplot(pms_outrosserviçosfamilias, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Outros Serviços às famílias', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c5 = ggplot(pms_informacaocomunicacao, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Total de Serviços de Inform/Comunic', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c6 = ggplot(pms_TIC, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Serviços de TI', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c7 = ggplot(pms_telecomunicacoes, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Serviços de Telecomunicações', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c8 = ggplot(pms_TI, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Serviços de TI', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c9 = ggplot(pms_audiovisual, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Serviços Audiovisuais', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c10 = ggplot(pms_admcomplementares, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Total de Serviços Administrativos', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c11 = ggplot(pms_tecnicoprofissionais, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Serviços Técnicos', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c12 = ggplot(pms_administrativoscomplementares, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Serviços Adm-Complem', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c13 = ggplot(pms_transportes, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Total de Serviços de Transporte', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c14 = ggplot(pms_transporteterrestre, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Transporte Terrestre', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c15 = ggplot(pms_transporteaquaviario, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Transporte Aquaviário', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c16 = ggplot(pms_transporteaereo, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Transporte Aéreo', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c17 = ggplot(pms_armazenagemtransporte, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Serviços de Armazenagem', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  c18 = ggplot(pms_outrosservicos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Outros Serviços', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  
+
+graficos_c_1 = gridExtra::grid.arrange(c1,c2,c3,c4,c5,c6, nrow = 2, ncol = 3)
+graficos_c_2 = gridExtra::grid.arrange(c7,c8,c9,c10,c11,c12, nrow = 2, ncol = 3)
+graficos_c_3 = gridExtra::grid.arrange(c13,c14,c15,c16,c17,c18, nrow = 2, ncol = 3)
+
+
+```
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+pms_ibge = sidrar::get_sidra(api = '/t/8162/n1/all/v/11621/p/last%2010/c11046/56725/c12355/all/d/v11621%205')
+
+pms_ibge = pms_ibge%>%
+  dplyr::mutate(mes = paste0(substr(pms_ibge$`Mês (Código)`, nchar(pms_ibge[1, 10])-5, nchar(pms_ibge[1, 10])-2),'-', substr(pms_ibge$`Mês (Código)`, nchar(pms_ibge[1, 10])-1, nchar(pms_ibge[1, 10])),'-', '01'))
+  
+pms_ibge$mes = as.Date(pms_ibge$mes)
+  
+selic = GetBCBData::gbcbd_get_series(id = 4390, use.memoise = F)%>%
+  dplyr::filter(ref.date < '2022-11-01')%>%
+  dplyr::filter(ref.date > '2021-12-01')%>%
+  dplyr::select(value)%>%
+  dplyr::rename(selic = value)
+
+
+pms_total = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == 'Total')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_familias = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '1. Serviços prestados às famílias')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_alojamentoalimentacao = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '1.1 Serviços de alojamento e alimentação')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_outrosserviçosfamilias = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '1.2 Outros serviços prestados às famílias')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_informacaocomunicacao = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '2. Serviços de informação e comunicação')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_TIC = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '2.1 Serviços de Tecnologia de Informação e Comunicação (TIC)')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_telecomunicacoes = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '2.1.1 Telecomunicações')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_TI = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '2.1.2 Serviços de Tecnologia da Informação')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_audiovisual = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '2.2 Serviços audiovisuais, de edição e agências de notícias')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_admcomplementares = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '3. Serviços profissionais, administrativos e complementares')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_tecnicoprofissionais = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '3.1 Serviços técnico-profissionais')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_administrativoscomplementares = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '3.2 Serviços administrativos e complementares')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_transportes = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '4. Transportes, serviços auxiliares aos transportes e correio')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_transporteterrestre = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '4.1 Transporte terrestre')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_transporteaquaviario = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '4.2 Transporte aquaviário')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_transporteaereo = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '4.3 Transporte aéreo')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_armazenagemtransporte = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '4.4 Armazenagem, serviços auxiliares aos transportes e correio')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+pms_outrosservicos = pms_ibge%>%
+  dplyr::filter(pms_ibge$`Atividades de serviços` == '5. Outros serviços')%>%
+  dplyr::select(Valor, `Atividades de serviços`, mes)%>%
+  cbind(selic)
+
+d1 = ggplot(pms_total)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Total de Serviços', x = 'selic', y = '')+theme_light()
+d2 = ggplot(pms_familias)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Total de Serviços às famílias', x = 'selic', y = '')+theme_light()
+d3 = ggplot(pms_alojamentoalimentacao)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Alojamento e Alimentação', x = 'selic', y = '')+theme_light()
+d4 = ggplot(pms_outrosserviçosfamilias)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Outros Serviços às famílias', x = 'selic', y = '')+theme_light()
+d5 = ggplot(pms_informacaocomunicacao)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Total de Serviços de Informação e Comunicação', x = 'selic', y = '')+theme_light()
+d6 = ggplot(pms_TIC)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Serviços de Tecnologia da Informação e Comunicação', x = 'selic', y = '')+theme_light()
+d7 = ggplot(pms_telecomunicacoes)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Serviços de Telecomunicações', x = 'selic', y = '')+theme_light()
+d8 = ggplot(pms_TI)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Serviços de TI', x = 'selic', y = '')+theme_light()
+d9 = ggplot(pms_audiovisual)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Serviços Audiovisuais', x = 'selic', y = '')+theme_light()
+d10 = ggplot(pms_admcomplementares)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Total de Serviços Administrativos', x = 'selic', y = '')+theme_light()
+d11 = ggplot(pms_tecnicoprofissionais)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Serviços Técnicos', x = 'selic', y = '')+theme_light()
+d12 = ggplot(pms_administrativoscomplementares)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Serviços Administrativo-Complementares', x = 'selic', y = '')+theme_light()
+d13 = ggplot(pms_transportes)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Total de Serviços de Transporte', x = 'selic', y = '')+theme_light()
+d14 = ggplot(pms_transporteterrestre)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Transporte Terrestre', x = 'selic', y = '')+theme_light()
+d15 = ggplot(pms_transporteaquaviario)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Transporte Aquaviário', x = 'selic', y = '')+theme_light()
+d16 = ggplot(pms_transporteaereo)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Transporte Aéreo', x = 'selic', y = '')+theme_light()
+d17 = ggplot(pms_armazenagemtransporte)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Serviços de Armazenagem', x = 'selic', y = '')+theme_light()
+d18 = ggplot(pms_outrosservicos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Outros Serviços', x = 'selic', y = '')+theme_light()
+
+graficos_d_1 = gridExtra::grid.arrange(d1,d2,d3,d4,d5,d6, nrow = 2, ncol = 3)
+graficos_d_2 = gridExtra::grid.arrange(d7,d8,d9,d10,d11,d12, nrow = 2, ncol = 3)
+graficos_d_3 = gridExtra::grid.arrange(d13,d14,d15,d16,d17,d18, nrow = 2, ncol = 3)
+
+```
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+pmc_ibge = sidrar::get_sidra(api = '/t/8187/n1/all/v/11706/p/last%2010/c11046/56733/c85/all/d/v11706%205')
+
+pmc_ibge = pmc_ibge%>%
+  dplyr::mutate(mes = paste0(substr(pmc_ibge$`Mês (Código)`, nchar(pmc_ibge[1, 10])-5, nchar(pmc_ibge[1, 10])-2),'-', substr(pmc_ibge$`Mês (Código)`, nchar(pmc_ibge[1, 10])-1, nchar(pmc_ibge[1, 10])),'-', '01'))
+  
+  pmc_ibge$mes = as.Date(pmc_ibge$mes)
+  
+  pmc_combustiveis = pmc_ibge%>%
+    dplyr::filter(pmc_ibge$Atividades == 'Combustíveis e lubrificantes')%>%
+    dplyr::select(Valor, Atividades, mes)
+  pmc_hipersupermercados = pmc_ibge%>%
+    dplyr::filter(pmc_ibge$Atividades == 'Hipermercados, supermercados, produtos alimentícios, bebidas e fumo')%>%
+    dplyr::select(Valor, Atividades, mes)
+  pmc_vestuario = pmc_ibge%>%
+    dplyr::filter(pmc_ibge$Atividades == 'Tecidos, vestuário e calçados')%>%
+    dplyr::select(Valor, Atividades, mes)
+  pmc_moveiseletrodomesticos = pmc_ibge%>%
+    dplyr::filter(pmc_ibge$Atividades == 'Móveis e eletrodomésticos')%>%
+    dplyr::select(Valor, Atividades, mes)
+  pmc_farmaceuticos = pmc_ibge%>%
+    dplyr::filter(pmc_ibge$Atividades == 'Artigos farmacêuticos, médicos, ortopédicos, de perfumaria e cosméticos')%>%
+    dplyr::select(Valor, Atividades, mes)
+  pmc_livrosjornaispapelaria = pmc_ibge%>%
+    dplyr::filter(pmc_ibge$Atividades == 'Livros, jornais, revistas e papelaria')%>%
+    dplyr::select(Valor, Atividades, mes)
+  pmc_equipamentosescritorio = pmc_ibge%>%
+    dplyr::filter(pmc_ibge$Atividades == 'Equipamentos e materiais para escritório, informática e comunicação')%>%
+    dplyr::select(Valor, Atividades, mes)
+  pmc_outrosartigos = pmc_ibge%>%
+    dplyr::filter(pmc_ibge$Atividades == 'Outros artigos de uso pessoal e doméstico')%>%
+    dplyr::select(Valor, Atividades, mes)
+  
+  e1 = ggplot(pmc_combustiveis, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Combustíveis e Lubrificantes', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  e2 = ggplot(pmc_hipersupermercados, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Hipermercados e Supermercados', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  e3 = ggplot(pmc_vestuario, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Tecidos, Vestuário e Calçados', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  e4 = ggplot(pmc_moveiseletrodomesticos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Móveis e Eletrodomésticos', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  e5 = ggplot(pmc_farmaceuticos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Artigos farmacêuticos, Perfumaria e Cosméticos', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  e6 = ggplot(pmc_livrosjornaispapelaria, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Livros, Jornais e Papelaria', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  e7 = ggplot(pmc_equipamentosescritorio, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Equipamentos e Materiais para Escritório', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  e8 = ggplot(pmc_outrosartigos, aes(x = mes))+geom_line(mapping = aes(y = Valor))+labs(title = 'Outros Artigos de uso Pessoal e Doméstico', x = '', y = '')+scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b'))+theme_light()
+  
+
+graficos_e_1 = gridExtra::grid.arrange(e1,e2,e3,e4, nrow = 2, ncol = 2)
+graficos_e_2 = gridExtra::grid.arrange(e5,e6,e7,e8, nrow = 2, ncol = 2)
+
+```
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+pmc_ibge = sidrar::get_sidra(api = '/t/8187/n1/all/v/11706/p/last%2010/c11046/56733/c85/all/d/v11706%205')
+
+pmc_ibge = pmc_ibge%>%
+  dplyr::mutate(mes = paste0(substr(pmc_ibge$`Mês (Código)`, nchar(pmc_ibge[1, 10])-5, nchar(pmc_ibge[1, 10])-2),'-', substr(pmc_ibge$`Mês (Código)`, nchar(pmc_ibge[1, 10])-1, nchar(pmc_ibge[1, 10])),'-', '01'))
+  
+pmc_ibge$mes = as.Date(pmc_ibge$mes)
+  
+selic = GetBCBData::gbcbd_get_series(id = 4390, use.memoise = F)%>%
+  dplyr::filter(ref.date < '2022-11-01')%>%
+  dplyr::filter(ref.date > '2021-12-01')%>%
+  dplyr::select(value)%>%
+  dplyr::rename(selic = value)
+  
+pmc_combustiveis = pmc_ibge%>%
+  dplyr::filter(pmc_ibge$Atividades == 'Combustíveis e lubrificantes')%>%
+  dplyr::select(Valor, Atividades, mes)%>%
+  cbind(selic)
+pmc_hipersupermercados = pmc_ibge%>%
+  dplyr::filter(pmc_ibge$Atividades == 'Hipermercados, supermercados, produtos alimentícios, bebidas e fumo')%>%
+  dplyr::select(Valor, Atividades, mes)%>%
+  cbind(selic)
+pmc_vestuario = pmc_ibge%>%
+  dplyr::filter(pmc_ibge$Atividades == 'Tecidos, vestuário e calçados')%>%
+  dplyr::select(Valor, Atividades, mes)%>%
+  cbind(selic)
+pmc_moveiseletrodomesticos = pmc_ibge%>%
+  dplyr::filter(pmc_ibge$Atividades == 'Móveis e eletrodomésticos')%>%
+  dplyr::select(Valor, Atividades, mes)%>%
+  cbind(selic)
+pmc_farmaceuticos = pmc_ibge%>%
+  dplyr::filter(pmc_ibge$Atividades == 'Artigos farmacêuticos, médicos, ortopédicos, de perfumaria e cosméticos')%>%
+  dplyr::select(Valor, Atividades, mes)%>%
+  cbind(selic)
+pmc_livrosjornaispapelaria = pmc_ibge%>%
+  dplyr::filter(pmc_ibge$Atividades == 'Livros, jornais, revistas e papelaria')%>%
+  dplyr::select(Valor, Atividades, mes)%>%
+  cbind(selic)
+pmc_equipamentosescritorio = pmc_ibge%>%
+  dplyr::filter(pmc_ibge$Atividades == 'Equipamentos e materiais para escritório, informática e comunicação')%>%
+  dplyr::select(Valor, Atividades, mes)%>%
+  cbind(selic)
+pmc_outrosartigos = pmc_ibge%>%
+  dplyr::filter(pmc_ibge$Atividades == 'Outros artigos de uso pessoal e doméstico')%>%
+  dplyr::select(Valor, Atividades, mes)%>%
+  cbind(selic)  
+
+f1 = ggplot(pmc_combustiveis)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Combustíveis e lubrificantes', x = 'selic', y = '')+theme_light()
+f2 = ggplot(pmc_hipersupermercados)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Hipermercados e Supermercados', x = 'selic', y = '')+theme_light()
+f3 = ggplot(pmc_vestuario)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Tecidos, Vestuário e Calçados', x = 'selic', y = '')+theme_light()
+f4 = ggplot(pmc_moveiseletrodomesticos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Móveis e Eletrodomésticos', x = 'selic', y = '')+theme_light()
+f5 = ggplot(pmc_farmaceuticos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Artigos farmacêuticos e Cosméticos', x = 'selic', y = '')+theme_light()
+f6 = ggplot(pmc_livrosjornaispapelaria)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Livros, jornais e papelaria', x = 'selic', y = '')+theme_light()
+f7 = ggplot(pmc_equipamentosescritorio)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Equipamentos e Materiais para Escritório', x = 'selic', y = '')+theme_light()
+f8 = ggplot(pmc_outrosartigos)+geom_point(mapping = aes(x = selic, y = difference(Valor)))+labs(title = 'Outros Artigos de uso pessoal e doméstico', x = 'selic', y = '')+theme_light()
+
+
+graficos_f_1 = gridExtra::grid.arrange(f1,f2,f3,f4, nrow = 3, ncol = 2)
+graficos_f_2 = gridExtra::grid.arrange(f5,f6,f7,f8, nrow = 2, ncol = 2)
+
+```
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+  ibcbr = GetBCBData::gbcbd_get_series(id = 24363, use.memoise = F)%>%
+    dplyr::filter(ref.date <= '2022-10-01')%>%
+    dplyr::filter(ref.date >= '2022-01-01')%>%
+    dplyr::select(value)%>%
+    dplyr::rename(ibcbr = value)
+  
+  #Produção Física Industrial, por Seções e Atividades Industrais
+  
+pim_geral_ibge = sidrar::get_sidra(api = '/t/8159/n1/all/v/11599/p/last%2010/c544/129314/d/v11599%205')
+
+pim_geral_ibge = pim_geral_ibge%>%
+  dplyr::mutate(mes = as.Date(paste0(substr(pim_geral_ibge$`Mês (Código)`, nchar(pim_geral_ibge[1, 10])-5, nchar(pim_geral_ibge[1, 10])-2),'-', substr(pim_geral_ibge$`Mês (Código)`, nchar(pim_geral_ibge[1, 10])-1, nchar(pim_geral_ibge[1, 10])),'-', '01')))
+    
+  pim_geral_ibge = pim_geral_ibge%>%
+    dplyr::select(mes, Valor)%>%
+    dplyr::rename(pim = Valor)
+  
+  pim_geral_ibge$mes = as.Date(pim_geral_ibge$mes)
+  
+  #Índice de Volume de Vendas no Comércio Varejista Ampliado
+  
+  pmc_geral_ibge = sidrar::get_sidra(api = '/t/8186/n1/all/v/11706/p/last%2010/c11046/56736/d/v11706%205')%>%
+    dplyr::select(Valor)%>%
+    dplyr::rename(pmc = Valor)
+  
+  #Índice do volume de serviços no Brasil
+  
+  pms_geral_ibge = sidrar::get_sidra(api = '/t/8161/n1/all/v/11621/p/last%2010/c11046/56726/d/v11621%205')%>%
+    dplyr::select(Valor)%>%
+    dplyr::rename(pms = Valor)  
+  
+
+dados = cbind(ibcbr, pim_geral_ibge, pmc_geral_ibge, pms_geral_ibge)%>%
+  as.data.frame()
+
+dados = dados%>%
+  dplyr::mutate(var_ibcbr = difference(ibcbr), var_pim = difference(pim), var_pmc = difference(pmc), var_pms = difference(pms))%>%
+  tidyr::drop_na()%>%
+  dplyr::select(mes, var_ibcbr, var_pim, var_pmc, var_pms)
+
+grafico_indices = ggplot(dados, aes(x = mes))+
+  geom_line(mapping = aes(y = var_ibcbr, colour = 'IBCBR (BCB)'))+
+  geom_line(mapping = aes(y = var_pim, colour = 'Índice de Produção Física Industrial (IBGE)'))+
+  geom_line(mapping = aes(y = var_pmc, colour = 'Índice do Volume de Vendas no Comércio Varejista (IBGE)'))+
+  geom_line(mapping = aes(y = var_pms, colour = 'Índice do Volume de Serviços (IBGE)'))+
+  scale_x_date(breaks = date_breaks('2 months'), labels = date_format('%b/%Y'))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(title = 'IBCBR vs Índices de Atividade Econômica', subtitle = 'Valores em Primeira Diferença', caption = 'Fonte: IBGE', x = '', y = '')+
+  theme_light()
+
+
+diff_ibcbr_ts = dados%>%
+  dplyr::select(var_ibcbr)%>%
+  as.ts()
+diff_pim_ts = dados%>%
+  dplyr::select(var_pim)%>%
+  as.ts()
+diff_pms_ts = dados%>%
+  dplyr::select(var_pmc)%>%
+  as.ts()
+diff_pmc_ts = dados%>%
+  dplyr::select(var_pms)%>%
+  as.ts()
+
+#teste de Dickey-Fulley-Ampliado
+
+adf.ibcbr = tseries::adf.test(diff_ibcbr_ts, c('stationary', 'explosive'))
+adf.pim = tseries::adf.test(diff_pim_ts, c('stationary', 'explosive'))
+adf.pms = tseries::adf.test(diff_pms_ts, c('stationary', 'explosive'))
+adf.pmc = tseries::adf.test(diff_pmc_ts, c('stationary', 'explosive'))
+
+ibcbr = (adf.ibcbr$p.value < 0.05)
+pim = (adf.pim$p.value < 0.05)
+pms = (adf.pms$p.value < 0.05)
+pmc = (adf.pmc$p.value < 0.05)
+
+if(ibcbr == TRUE){
+  print('Há evidência de que a Variação de IBCBR é estacionária ao nível de 5% de significância')
+}
+if(pim == TRUE){
+  print('Há evidência de que a Variação de Índice de Produção Física da Indústria é estacionária ao nível de 5% de significância')
+}
+if(pmc == TRUE){
+  print('Há evidência de que a Variação de Índice do Volume de Serviços é estacionária ao nível de 5% de significância')
+}
+if(pmc == TRUE){
+  print('Há evidência de que a Variação de Índice do Volume de Comércio Varejista em número-índice é estacionária ao nível de 5% de significância')
+}
+  
+corr = round(cor(dados[2:5]), 1)
+
+matriz_correlacao = ggcorrplot::ggcorrplot(corr,  hc.order = T,  type = 'lower', lab = T, lab_size = 3, method = 'circle', colors = c('tomato2', 'white', 'springgreen3'), title = 'Matriz de Correlação dos Índices', ggtheme = theme_bw)
+  
+graficos = gridExtra::grid.arrange(grafico_indices, matriz_correlacao, nrow = 2)
+
+```
+
