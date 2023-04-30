@@ -1,0 +1,943 @@
+---
+title: "Análise sobre as ações da Lojas Renner (LREN3)"
+author: 
+ 
+output: 
+  pdf_document:
+    
+    number_sections: true
+    
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 11pt
+
+---
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+library(dplyr)
+library(readxl)
+library(quantmod)
+library(ggplot2)
+library(scales)
+library(ggridges)
+library(GetDFPData2)
+library(tibble)
+library(gridExtra)
+library(glue)
+library(zoo)
+library(tsibble)
+library(tseries)
+library(magrittr)
+
+```
+
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+tickers <- list('LREN3.SA', 'VIIA3.SA', 'ARZZ3.SA', 'GUAR3.SA', '^BVSP')
+from <- "2010-01-01"
+to <- "2022-12-30"
+st <- do.call(
+  merge,
+  lapply(
+    tickers,
+    function(ticker) {
+      getSymbols(ticker,
+                 from = from,
+                 to = to,
+                 auto.assign = FALSE,
+                 verbose = FALSE,
+                 warnings = FALSE
+      ) |>
+        na.omit()
+    }
+  )
+)%>%
+  as.data.frame()%>%
+  tibble::rownames_to_column(var = 'Date')%>%
+  dplyr::mutate(lren_indice = LREN3.SA.Adjusted / LREN3.SA.Adjusted[1],
+                via_indice = VIIA3.SA.Adjusted / VIIA3.SA.Adjusted[1], 
+                arezzo_indice = ARZZ3.SA.Adjusted / ARZZ3.SA.Adjusted[1], 
+                guar_indice = GUAR3.SA.Adjusted / GUAR3.SA.Adjusted[1],
+                ibov_indice = BVSP.Adjusted / BVSP.Adjusted[1])%>%
+  as.data.frame()
+
+lren_diff = difference(st$LREN3.SA.Adjusted)%>%
+  as.data.frame()%>%
+  tidyr::drop_na()%>%
+  as.ts()
+
+ibov_diff = difference(st$BVSP.Adjusted)%>%
+  as.data.frame()%>%
+  tidyr::drop_na()%>%
+  as.ts()
+
+lren_diff%>%
+  as.data.frame()%>%
+  tidyr::drop_na()%>%
+  as.ts()%>%
+  adf.test()
+
+ibov_diff%>%
+  as.data.frame()%>%
+  tidyr::drop_na()%>%
+  as.ts()%>%
+  adf.test()
+
+df_model = cbind(lren_diff, ibov_diff)
+
+m=lm(lren_diff~ibov_diff, data = df_model)
+
+d1 = ggplot2::ggplot(st)+
+  geom_point(mapping = aes(x = BVSP.Adjusted, y = LREN3.SA.Adjusted), 
+             size = 0.08)+
+  labs(title = 'Dispersão Ibov vs LREN3', x = 'Ibovespa', y = 'Lojas Renner')+
+  theme_classic()
+d2 = ggplot2::ggplot(st)+
+  geom_point(mapping = aes(x = BVSP.Adjusted, y = VIIA3.SA.Adjusted), 
+             size = 0.08)+
+  labs(title = 'Dispersão Ibov vs VIIA3', x = 'Ibovespa', y = 'Via')+
+  theme_classic()
+d3 = ggplot2::ggplot(st)+
+  geom_point(mapping = aes(x = BVSP.Adjusted, y = ARZZ3.SA.Adjusted), 
+             size = 0.08)+
+  labs(title = 'Dispersão Ibov vs Arezzo', x = 'Ibovespa', y = 'Arezzo')+
+  theme_classic()
+d4 = ggplot2::ggplot(st)+
+  geom_point(mapping = aes(x = BVSP.Adjusted, y = GUAR3.SA.Adjusted), 
+             size = 0.08)+
+  labs(title = 'Dispersão Ibov vs GUAR3', x = 'Ibovespa', y = 'Guararapes')+
+  theme_classic()
+
+gridExtra::grid.arrange(d1,d2,d3,d4, nrow = 2)
+
+dfp_lren_1 = GetDFPData2::get_dfp_data(
+  companies_cvm_codes = 8133, 
+  use_memoise = F, 
+  clean_data = T, 
+  cache_folder = tempdir(), 
+  type_docs = c('DRE', 'BPA', 'BPP', 'DFC_MI'), 
+  type_format = 'con',
+  first_year = 2010, last_year = 2022)
+
+dre_lren = dfp_lren_1$`DF Consolidado - Demonstração do Resultado`
+
+lbruto=dre_lren%>%
+  dplyr::filter(DS_CONTA == 'Resultado Bruto')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(data = DT_REFER, lbruto = VL_CONTA)
+
+lliq=dre_lren%>%
+  dplyr::filter(DS_CONTA == 'Lucro/Prejuízo Consolidado do Período')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(data = DT_REFER, lliq = VL_CONTA)
+
+st$Date = st$Date%>%
+  as.Date()
+ggplot(st, aes(x = Date))+
+  geom_line(mapping = aes(y = ibov_indice, colour = 'IBOV'))+
+  geom_line(mapping = aes(y = lren_indice, colour = 'LREN3'))+
+  geom_line(mapping = aes(y = via_indice, colour = 'VIIA3'))+
+  geom_line(mapping = aes(y = arezzo_indice, colour = 'ARZZ3'))+
+  geom_line(mapping = aes(y = guar_indice, colour = 'GUAR3'))+
+  scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
+  scale_y_continuous(breaks = seq(0, 12, 1))+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(title = 'Ibovespa vs Setor de Varejo', 
+       subtitle = 'Valores em Número-Índice', 
+       x = '', 
+       y = '', caption = 'Fonte: Yahoo Finance')
+
+desemprego = ipeadatar::ipeadata(code='ECONMI12_ALU12')%>%
+  dplyr::select(date, value)%>%
+  dplyr::rename(desemprego = value)
+
+vendas_varejo = ipeadatar::ipeadata(code = 'PMC12_IVVRSA12')%>%
+  dplyr::select(date, value)%>%
+  dplyr::rename(vendas_varejo = value)
+
+massa_sal = ipeadatar::ipeadata(code = 'PNADC12_MRRTH12')%>%
+  dplyr::select(date, value)%>%
+  dplyr::rename(massa_sal = value)
+
+op_credito = ipeadatar::ipeadata(code = 'BM12_CCA12')%>%
+  dplyr::select(date, value)%>%
+  dplyr::rename(op_credito = value)
+
+dados = dplyr::inner_join(vendas_varejo, massa_sal, by = 'date')%>%
+  dplyr::inner_join(desemprego, by = 'date')%>%
+  dplyr::inner_join(op_credito, by = 'date')
+
+dados$date = as.Date(dados$date)
+
+ipca = GetBCBData::gbcbd_get_series(id = 433, use.memoise = F)%>%
+  dplyr::select(ref.date, value)%>%
+  dplyr::rename(data = ref.date, ipca = value)
+
+igpm = GetBCBData::gbcbd_get_series(id = 189, use.memoise = F)%>%
+  dplyr::select(ref.date, value)%>%
+  dplyr::rename(data = ref.date, igpm = value)
+
+pibm=ipeadatar::ipeadata(code='BM12_PIB12')%>%
+  dplyr::select(date, value)%>%
+  dplyr::rename(data = date, pib = value)
+
+lubridate::day(ipca$data) = 31
+lubridate::day(igpm$data) = 31
+lubridate::day(pibm$data) = 31
+
+ipca$data = as.Date(ipca$data, format = '%Y%b%d')
+igpm$data = as.Date(igpm$data, format = '%Y%b%d')
+pibm$data = as.Date(pibm$data, format = '%Y%b%d')
+lbruto$data = as.Date(lbruto$data, format = '%Y%b%d')
+lliq$data = as.Date(lliq$data, format = '%Y%b%d')
+
+dadosres = dplyr::inner_join(lbruto, lliq, by = 'data')
+dadosres = dplyr::inner_join(dadosres, ipca, by = 'data')
+dadosres = dplyr::inner_join(dadosres, igpm, by = 'data')
+dadosres = dplyr::inner_join(dadosres, pibm, by = 'data')
+
+dadosres$data = as.Date(dadosres$data, format = '%Y%b%d')
+
+g1=
+  (
+    dados%>%
+      dplyr::mutate(
+        vendas_indice = vendas_varejo / vendas_varejo[1],
+        massa_sal_indice = massa_sal / massa_sal[1],
+        desemprego_indice = desemprego / desemprego[1],
+        op_credito_indice = op_credito / op_credito[1]
+        )%>%
+      ggplot(aes(x = date))+
+      geom_line(mapping = aes(y = vendas_indice, 
+                          colour = 'Vendas do Varejo (Dessazonalizadas)'))+
+      
+      geom_line(mapping = aes(y = massa_sal_indice,
+                              colour = 'Massa Salarial'))+
+      
+      geom_line(mapping = aes(y = desemprego_indice, 
+                          colour = 'Taxa de Desemprego'))+
+      geom_line(mapping = aes(y = op_credito_indice, 
+                          colour = 'Total de Concessões de Crédito'))+
+      scale_x_date(breaks = date_breaks('4 months'), labels = date_format('%b%Y'))+
+      scale_y_continuous(breaks = seq(0.2,3,0.1))+
+      theme_classic()+
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
+      labs(title = 'Drivers de Crescimento Comércio Varejista', 
+      subtitle = 'Valores em Número-Índice', x = '', y = '', 
+      caption = 'Fonte: IpeaData')
+)
+#dadosres$data=lubridate::as_date(dadosres$data)
+
+g2=
+  (
+    dadosres%>%
+      dplyr::mutate(lbruto_indice = lbruto / lbruto[1],
+                    lliq_indice = lliq / lliq[1],
+                    ipca_indice = ipca / ipca[1],
+                    igpm_indice = igpm / igpm[1],
+                    pib_indice = pib / pib[1])%>%
+      ggplot(aes(x = dadosres$data))+
+      geom_line(mapping = aes(y=lbruto_indice, colour = 'Lucro Bruto'))+
+      geom_line(mapping = aes(y=lliq_indice, colour = 'Lucro Líquido'))+
+      geom_line(mapping = aes(y=ipca_indice, colour = 'IPCA'))+
+      geom_line(mapping = aes(y=igpm_indice, colour = 'IGP-M'))+
+      geom_line(mapping = aes(y=pib_indice, colour = 'Produto Interno Bruto'))+
+      theme_classic()+
+      scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+          plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+      labs(title = 'Evolução dos Resultados da Companhia',
+      subtitle = 'Valores em Número-índice',
+      caption = 'Fonte: Banco Central, CVM & IpeaData')
+)
+
+gridExtra::grid.arrange(g1,g2,nrow=2,ncol=1)
+
+```
+
+Em um análise de primeiro estágio, pode-se observar a falta de coincidência entre 
+os movimentos da massa salarial e concessões de crédito, que passaram a crescer 
+fortemente a partir de abr/22 e de dez/20, respectivamente, da taxa de desemprego, 
+que tem diminuído constantemente na última década,e do volume de vendas no comércio 
+varejista, que permaneceu estacioário nesse período.
+Esse fato sugere a possibilidade de o comércio varejista estar sendo contido por 
+outros fatores além do crescimento da massa salarial, ou até mesmo uma redução da 
+propensão marginal a consumir nesse segmento.Os Resultados Bruto e Operacional da
+companhia, no período observado, não parecem ter apresentado qualquer associação
+significativa com os índices de preços considerados.
+ 
+A Lojas Renner S.A, maior varejista de moda no Brasil, é um ecossistema de moda 
+e lifestyle que distribui seus produtos através de canais on-line e de mais de
+600 lojas no Brasil, Argentina e Uruguai.Fundada em 1965, hoje é líder no varejo
+de moda onichannel no Brasil.
+
+```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
+
+compos_DRE = dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
+  as.data.frame()%>%
+  dplyr::filter(DS_CONTA == 'Receita de Venda de Bens e/ou Serviços' |
+                  DS_CONTA == 'Custo dos Bens e/ou Serviços Vendidos' |
+                  DS_CONTA == 'Resultado Bruto' |
+                  DS_CONTA == 'Despesas/Receitas Operacionais' |
+                  DS_CONTA == 'Resultado Financeiro' |
+                  DS_CONTA == 'Lucro/Prejuízo Consolidado do Período')%>%
+  dplyr::select(DT_REFER, DS_CONTA, VL_CONTA)
+
+
+
+lubridate::month(compos_DRE$DT_REFER) = 01
+compos_DRE$VL_CONTA=compos_DRE$VL_CONTA / 1000
+
+compos_DRE%>%
+  ggplot(aes(x = DT_REFER, y = VL_CONTA))+
+  geom_col(aes(fill = DS_CONTA))+
+  theme_classic()+
+  theme(legend.position = 'top',
+        legend.key.size = unit(0.3, 'cm'),
+        legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
+  labs(title = 'Evolução da Composição do Demonstrativo de Resultado da Companhia', 
+       subtitle = 'R$ Milhões', x = '', y = '',
+       caption = 'Fonte: CVM')
+
+dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
+  as.data.frame()%>%
+  dplyr::filter(DS_CONTA == 'Receita de Venda de Bens e/ou Serviços' |
+                  DS_CONTA == 'Outras Receitas Operacionais' |
+                  DS_CONTA == 'Receitas Financeiras')%>%
+  ggplot(aes(x = DT_REFER, y = VL_CONTA))+
+  geom_col(aes(fill = DS_CONTA))+
+  theme_classic()+
+  theme(legend.position = 'top',
+        legend.key.size = unit(0.3, 'cm'),
+        legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
+  labs(title = 'Evolução da Composição da Receita da Companhia', 
+       x = '', y = '', subtitle = 'R$ Milhões',
+       caption = 'Fonte: CVM')
+
+pib = ipeadatar::ipeadata(code = 'BM12_PIB12')%>%
+  dplyr::select(date, value)%>%
+  dplyr::rename(pib = value)%>%
+  dplyr::mutate(var_pib = (pib - pib[-1]) / pib[-1])%>%
+  dplyr::rename(DT_REFER = date)%>%
+  dplyr::mutate(ano = lubridate::year(DT_REFER))
+
+ipca = ipeadatar::ipeadata(code = 'PAN_IPCAG')%>%
+  dplyr::select(date, value)%>%
+  dplyr::rename(ipca = value)%>%
+  dplyr::rename(DT_REFER = date)%>%
+  dplyr::mutate(ano = lubridate::year(DT_REFER))
+
+igp = ipeadatar::ipeadata(code = 'IGP_IGPMG')%>%
+  dplyr::select(date, value)%>%
+  dplyr::rename(igp = value)%>%
+  dplyr::rename(DT_REFER = date)%>%
+  dplyr::mutate(ano = lubridate::year(DT_REFER))
+
+lucrobruto = dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
+  dplyr::filter(DS_CONTA == 'Resultado Bruto')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(lucrobruto = VL_CONTA)%>%
+  dplyr::mutate(ano = lubridate::year(DT_REFER))
+
+lucroper = dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
+  dplyr::filter(DS_CONTA == 'Resultado Antes do Resultado Financeiro e dos Tributos')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(lucroper = VL_CONTA)
+ 
+lucroliq = dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
+  dplyr::filter(DS_CONTA == 'Lucro/Prejuízo Consolidado do Período')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(lucroliq = VL_CONTA)
+
+dt = cbind(lucrobruto, lucroper, lucroliq)%>%
+  dplyr::inner_join(pib, by = 'ano')%>%
+  dplyr::inner_join(igp, by = 'ano')%>%
+  dplyr::inner_join(ipca, by = 'ano')
+  
+dt$lucrobruto = dt$lucrobruto / 1000
+dt$lucroper = dt$lucroper / 1000
+dt$lucroliq = dt$lucroliq / 1000
+dt$DT_REFER.x = as.Date(dt$DT_REFER.x)
+
+dt%>%
+  ggplot(aes(x = DT_REFER.x))+
+  geom_bar(aes(y = var_pib), 
+           stat = 'identity', 
+           position = 'identity', colour = ifelse(dt$var_pib > 0, 'blue', 'red'),
+           fill = ifelse(dt$var_pib > 0, 'blue', 'red'), width = 20.0)+
+  geom_bar(aes(y = lucrobruto), stat = 'identity', 
+           position = 'identity', colour = 'green', fill = 'green', width = 20.0)+
+  geom_bar(aes(y = lucroper), stat = 'identity', 
+           position = 'identity', colour = 'orange', fill = 'orange')+
+  geom_bar(aes(y = lucroliq), stat = 'identity', 
+           position = 'identity', colour = 'purple', fill = 'purple')+
+  geom_line(mapping = aes(y = ipca, colour = 'IPCA'))+
+  geom_line(mapping = aes(y = igp, colour = 'IGP-M'))+
+  theme_classic()+
+  scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(title = 'Crescimento Econômico, Inflação e Resultados da Companhia',
+       x = '', y = '', subtitle = 'R$ Mil', caption = 'Fonte: CVM & Ibge')
+  
+dre_lren_1 = dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
+  as.data.frame()
+
+receita = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Receita de Venda de Bens e/ou Serviços')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(receita = VL_CONTA)
+
+cmv = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Custo dos Bens e/ou Serviços Vendidos')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(cmv = VL_CONTA)
+
+sga = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Despesas/Receitas Operacionais')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(sga = VL_CONTA)
+
+deprec_amort = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Depreciações e amortizações')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(deprec_amort = VL_CONTA)
+
+ir = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Imposto de Renda e Contribuição Social sobre o Lucro')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(ir = VL_CONTA)
+
+bpa_lren_1 = dfp_lren_1$`DF Consolidado - Balanço Patrimonial Ativo`%>%
+  as.data.frame()
+
+contasreceber = bpa_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Contas a Receber')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(contasreceber = VL_CONTA)
+
+estoques = bpa_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Estoques')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(estoques = VL_CONTA)
+
+caixae_equiv_caixa = bpa_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Caixa e Equivalentes de Caixa')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(caixa = VL_CONTA)
+
+bpp_lren_1 = dfp_lren_1$`DF Consolidado - Balanço Patrimonial Passivo`%>%
+  as.data.frame()
+
+emp_finac = bpp_lren_1%>%
+  dplyr::filter(CD_CONTA == '2.01.04')%>%
+  dplyr::filter(DT_REFER == '2010-12-31')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(empfinanc = VL_CONTA)
+
+fornecedores = bpp_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Fornecedores')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(fornecedores = VL_CONTA)
+
+pmr_projetado = mean(contasreceber[1, 'contasreceber'][[1]] / receita[1, 'receita'][[1]] * 365, 
+                     contasreceber[2, 'contasreceber'][[1]] / receita[2, 'receita'][[1]] * 365)
+
+pme_projetado = mean(estoques[1, 'estoques'] /(-1* cmv[1, 'cmv']) * 365, 
+                     estoques[2, 'estoques'] / (-1*cmv[2, 'cmv']) * 365)
+
+pmp_projetado = mean(fornecedores[1, 'fornecedores'] / (-1* cmv[1, 'cmv']) * 365, 
+                     fornecedores[2, 'fornecedores'] / (-1* cmv[1, 'cmv']) * 365)
+
+
+dfc_lren_1 = dfp_lren_1$`DF Consolidado - Demonstração do Fluxo de Caixa (Método Indireto)`%>%
+  as.data.frame()
+
+capex = dfc_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Aquisições do imobilizado' | DS_CONTA == 'Aquisições 
+                do intangível')%>%
+  dplyr::rename(capex = VL_CONTA)
+
+capex = capex%>%
+  as.data.frame()%>%
+  dplyr::filter(DT_FIM_EXERC == '2010-12-31')
+
+emprestimos_finac = dfc_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Empréstimos tomados')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(empfinanc = VL_CONTA)
+
+for(i in 1:length(1:17)){
+  if(i == 1){
+    receita_projetada = 1.20*receita[1, 'receita'][[1]]
+    receitas_proj = receita_projetada
+  } else {
+    receita_projetada = 1.20*receita_projetada
+    receitas_proj = rbind(receitas_proj, receita_projetada)
+  }
+  
+}
+
+
+for(i in 1:nrow(cmv)){
+  if(i == 1){
+    proj_cmv = cmv[1, 'cmv']
+    projecoes = proj_cmv
+  } else {
+    proj_cmv = cmv[i-1, 'cmv']*1.02
+    projecoes = rbind(projecoes, proj_cmv)
+  }
+  
+}
+
+projecoes = projecoes*-1
+
+media_perc_sga_receita = mean((-1*sga[1, 'sga'] / receita[1, 'receita']), 
+                              (-1*sga[2, 'sga'] /  receita[2, 'receita']))
+
+
+for(i in 1:nrow(receitas_proj)){
+  if(i == 1){
+    sga_projetado = media_perc_sga_receita*receitas_proj[i,][[1]]
+    sga_proj = sga_projetado
+  } else if(i < 13){
+    sga_projetado = media_perc_sga_receita*receitas_proj[i,][[1]]
+    sga_proj = rbind(sga_proj, sga_projetado)
+  } else {
+    sga_projetado = media_perc_sga_receita*receitas_proj[i,][[1]]
+    sga_proj = rbind(sga_proj, sga_projetado)
+  }
+  
+}
+
+media_perc_deprecamort_receita = mean((-1*deprec_amort[1, 'deprec_amort'][1] /  receita[1, 'receita'][1]),(-1*deprec_amort[2, 'deprec_amort'][1] / receita[2, 'receita'][1]))
+for(i in 1:nrow(receitas_proj)){
+  if(i == 1){
+    deprecamort_projetado = media_perc_deprecamort_receita*receitas_proj[i,][[1]]
+    deprecamort_proj = deprecamort_projetado
+  } else if(i < 13){
+    deprecamort_projetado = media_perc_sga_receita*receitas_proj[i,][[1]]
+    deprecamort_proj = rbind(deprecamort_proj, deprecamort_projetado)
+  } else {
+    i = i - 1
+    deprecamort_projetado = media_perc_sga_receita*receitas_proj[i,][[1]]
+    deprecamort_proj = rbind(deprecamort_proj, deprecamort_projetado)
+  }
+  
+}
+
+for(i in 1:nrow(receitas_proj)){
+  if(i == 1){
+    contasreceber_projetado = pmr_projetado*receitas_proj[i,][[1]]/ 365
+    contasreceber_proj = contasreceber_projetado
+  } else if(i < 13){
+    contasreceber_projetado = pmr_projetado*receitas_proj[i,][[1]]/ 365
+    contasreceber_proj = rbind(contasreceber_proj, contasreceber_projetado)
+  } else {
+    contasreceber_projetado = pmr_projetado*receitas_proj[i,][[1]]/ 365
+    contasreceber_proj = rbind(contasreceber_proj, contasreceber_projetado)
+  }
+  
+}
+
+for(i in 1:nrow(projecoes)){
+  if(i == 1){
+    estoque_projetado = pme_projetado*projecoes[i,][[1]]/ 365*-1
+    estoque_proj = estoque_projetado
+  } else if(i < 13){
+    estoque_projetado = pme_projetado*projecoes[i,][[1]]/ 365*-1
+    estoque_proj = rbind(estoque_proj, estoque_projetado)
+  } else {
+    estoque_projetado = pme_projetado*projecoes[i,][[1]]/ 365*-1
+    estoque_proj = rbind(estoque_proj, estoque_projetado)
+  }
+  
+}
+
+for(i in 1:nrow(projecoes)){
+  if(i == 1){
+    fornecedores_projetado = pmp_projetado*projecoes[i,][[1]]/ 365
+    fornecedores_proj = fornecedores_projetado
+  } else if(i < 13){
+    fornecedores_projetado = pmp_projetado*projecoes[i,][[1]]/ 365
+    fornecedores_proj = rbind(fornecedores_proj, fornecedores_projetado)
+  } else {
+    fornecedores_projetado = pmp_projetado*projecoes[i,][[1]]/ 365
+    fornecedores_proj = rbind(fornecedores_proj, fornecedores_projetado)
+  }
+  
+}
+
+for(i in 1:nrow(estoque_proj)){
+  if(i == 1){
+    ncg_projetado = contasreceber_proj[i,][[1]]+estoque_proj[i,][[1]]+
+      fornecedores_proj[i,][[1]]
+    ncg_proj = ncg_projetado
+  } else if(i < 13){
+    ncg_projetado = contasreceber_proj[i,][[1]]+estoque_proj[i,][[1]]+
+      fornecedores_proj[i,][[1]]
+    ncg_proj = rbind(ncg_proj, ncg_projetado)
+  } else {
+    ncg_projetado = contasreceber_proj[i,][[1]]+estoque_proj[i,][[1]]+
+      fornecedores_proj[i,][[1]]
+    ncg_proj = rbind(ncg_proj, ncg_projetado)
+  }
+  
+}
+
+tx_pre = readxl::read_xlsx('C:/Users/Arthur/Desktop/difuturo.xlsx', 
+                           sheet = 'Planilha1', 
+                           skip = 1, 
+                           col_names = c('Data', 
+                                         'Média DI', 
+                                         'taxapre6anos', 
+                                         'taxapre10anos'))%>%
+  dplyr::select(taxapre6anos, taxapre10anos)
+
+
+estrutura_capital_lren =
+  readxl::read_xlsx('C:/Users/Arthur/Desktop/composicaocapitallren.xlsx',
+                    skip = 1)%>%
+  dplyr::mutate(`Capital Total` = `Patrimônio Líquido no Mercado` + `Dívida Bruta`)%>%
+  dplyr::mutate(peso_equity = `Patrimônio Líquido no Mercado` / `Capital Total`,
+                peso_divida = `Dívida Bruta` / `Capital Total`)
+
+dados_wacc = cbind(estrutura_capital_lren, tx_pre)%>%
+  dplyr::mutate(ke = taxapre10anos + coef(m)[2]*4,
+                kd = taxapre10anos + coef(m)[2]*4,
+                wacc = kd*peso_divida+ke*peso_equity)
+
+wacc = dados_wacc%>%
+  dplyr::select(wacc)
+
+for(i in 6:nrow(receitas_proj)){
+  if(i == 6){
+    j = 2
+    valor_perpetuidade_gordon = (receitas_proj[i,][[1]]*1000)*1.04 / 
+      ((dados_wacc[j, 'wacc'] / 100) - 0.04)[[1]]
+    val_perpet_gordon = valor_perpetuidade_gordon
+  } else {
+    j = j + 1
+    valor_perpetuidade_gordon = (receitas_proj[i,][[1]]*1000)*1.04 / 
+      ((dados_wacc[j, 'wacc'] / 100) - 0.04)[[1]]
+    val_perpet_gordon = rbind(val_perpet_gordon, valor_perpetuidade_gordon)
+  }
+  
+}
+
+for(i in 1:nrow(receitas_proj)-3){
+  if(i == 1){
+    ebit_projetado = (receitas_proj[i,][[1]]+
+                   cmv[2, 'cmv'][[1]]-
+                   sga[2, 'sga'][[1]]-
+                   deprec_amort[2, 'deprec_amort'][[1]]+
+                   ir[2, 'ir'][[1]]+
+                   deprec_amort[2, 'deprec_amort'][[1]]+
+                   sum(capex[,'capex'])[[1]]+
+                   ncg_proj[i, ][[1]])*1000
+    
+    ebit_proj = ebit_projetado
+    
+    } else {
+      i = i - 1
+      ebit_projetado = (receitas_proj[i,][[1]]-
+                          projecoes[i,][[1]]-
+                          sga_proj[i,][[1]]-
+                          deprecamort_proj[i,][[1]]+
+                          ir[2, 'ir'][[1]]+
+                          deprecamort_proj[i,][[1]]+
+                          sum(capex[,'capex'])[[1]]+
+                          ncg_proj[i, ][[1]])*1000
+      ebit_proj = rbind(ebit_proj, ebit_projetado)
+      
+    }
+  
+}
+
+for(i in 1:nrow(receitas_proj)){
+  if(i==1){
+    cmv_projs = 1.02*cmv[1,'cmv'][[1]] 
+  }
+  
+  else {
+    cmv_projetado = 1.02*cmv[i-1,'cmv'][[1]]
+    cmv_projs = rbind(cmv_projs, cmv_projetado)
+  }
+}
+
+for(i in 1:nrow(ebit_proj)){
+  if(i == 1){
+    fcff_projetado = (receitas_proj[1,][[1]]-
+                        cmv_projs[i,][[1]]-
+                        sga_proj[i,][[1]]-
+                        deprecamort_proj[i,][[1]]+
+                        ir[2, 'ir'][[1]]+
+                        deprecamort_proj[i,][[1]]+
+                        sum(capex[,'capex'])[[1]]+
+                        ncg_proj[i, ][[1]])*1000
+    fcff_proj = fcff_projetado
+  } else {
+    i = i -1
+    fcff_projetado = (receitas_proj[1,][[1]]-
+                        cmv_projs[i,][[1]]-
+                        sga_proj[i,][[1]]-
+                        deprecamort_proj[i,][[1]]+
+                        ir[2, 'ir'][[1]]+
+                        deprecamort_proj[i,][[1]]+
+                        sum(capex[,'capex'])[[1]]+
+                        ncg_proj[i,][[1]])*1000
+    
+    fcff_proj = rbind(fcff_proj, fcff_projetado)
+    
+  }
+  
+}
+
+for(i in 5:nrow(ebit_proj)){
+  if(i == 5){
+    valor_perpetuidade_evebitda = 10*(ebit_proj[i,][[1]]-
+                                        deprecamort_proj[i,][[1]])[[1]]
+    val_perpet_evebitda = valor_perpetuidade_evebitda
+  } else {
+    valor_perpetuidade_evebitda = 10*(ebit_proj[i,][[1]]-
+                                        deprecamort_proj[i,][[1]])[[1]]
+    val_perpet_evebitda = rbind(val_perpet_evebitda, valor_perpetuidade_evebitda)
+    
+  }
+    
+}
+
+
+for(i in 1:nrow(val_perpet_evebitda)){
+  if(i == 1){
+    valor_perpetuidade = mean(val_perpet_evebitda[i,], 
+                              val_perpet_gordon[i,])[[1]]
+    val_perpet = valor_perpetuidade
+  } else {
+    i = i -1
+    valor_perpetuidade = mean(val_perpet_evebitda[i,], 
+                              val_perpet_gordon[i,])[[1]]
+    val_perpet = rbind(val_perpet, valor_perpetuidade)
+  }
+}
+
+for(i in 2:(nrow(fcff_proj))){
+  if(i == 2){
+    e = 2
+    fcd_projetado = fcff_proj[i,] / (1+(wacc[i-1, 'wacc'] / 100))+
+      fcff_proj[i+1,] / (1+(wacc[i, 'wacc'] / 100)^e)+
+      fcff_proj[i+2,] / (1+(wacc[i+1, 'wacc'] / 100 )^(e+1))+
+      fcff_proj[i+3,] / (1+(wacc[i+2, 'wacc'] / 100)^(e+2))+
+      val_perpet[i,] / (1+(wacc[i, 'wacc'] / 100)^(e+3))
+    fcd_proj = fcd_projetado
+  } else if(i < 10){
+    e = 2
+    fcd_projetado = fcff_proj[i,] / (1+(wacc[i-1, 'wacc'] / 100))+
+      fcff_proj[i+1,] / (1+(wacc[i, 'wacc'] / 100)^e)+
+      fcff_proj[i+2,] / (1+(wacc[i+1, 'wacc'] / 100)^(e+1))+
+      fcff_proj[i+3,] / (1+(wacc[i+2, 'wacc'] / 100)^(e+2))+
+      val_perpet[i,] / (1+(wacc[i, 'wacc'] / 100)^(e+3))
+    fcd_proj = rbind(fcd_proj, fcd_projetado)
+  } else if(i == 10){
+    e = 2
+    fcd_projetado = fcff_proj[i,] / (1+(wacc[i-1, 'wacc'] / 100))+
+      fcff_proj[i+1,] / (1+(wacc[i, 'wacc'] / 100)^e)+
+      fcff_proj[i+2,] / (1+(wacc[i+1, 'wacc'] / 100)^(e+1))+
+      fcff_proj[i+2,] / (1+(wacc[i+2, 'wacc'] / 100)^(e+2))+
+      val_perpet[i,] / (1+(wacc[i+3, 'wacc'] / 100)^(e+3))
+    fcd_proj = rbind(fcd_proj, fcd_projetado)
+  } else if(i == 11){
+    e = 2
+    fcd_projetado = fcff_proj[i,] / (1+(wacc[i-1, 'wacc'] / 100))+
+      fcff_proj[i+2,] / (1+(wacc[i, 'wacc'] / 100)^e)+
+      fcff_proj[i+2,] / (1+(wacc[i+1, 'wacc'] / 100)^(e+1))+
+      fcff_proj[i+2,] / (1+(wacc[i+2, 'wacc'] / 100)^(e+2))+
+      val_perpet[nrow(val_perpet),] / (1+(wacc[i+3, 'wacc'] / 100)^(e+3))
+    fcd_proj = rbind(fcd_proj, fcd_projetado)
+  } else if(i == 12){
+    e = 2
+    fcd_projetado = fcff_proj[i,] / (1+(wacc[i-1, 'wacc'] / 100))+
+      fcff_proj[i+1,] / (1+(wacc[i, 'wacc'] / 100)^e)+
+      fcff_proj[i+1,] / (1+(wacc[i+1, 'wacc'] / 100)^(e+1))+
+      fcff_proj[i+1,] / (1+(wacc[i+2, 'wacc'] / 100)^(e+2))+
+      val_perpet[nrow(val_perpet),] / (1+(wacc[i+3, 'wacc'] / 100)^(e+3))
+    fcd_proj = rbind(fcd_proj, fcd_projetado)
+  } else {
+    e = 2
+    fcd_projetado = fcff_proj[i,] / (1+(wacc[i-1, 'wacc'] / 100))+
+      fcff_proj[i,] / (1+(wacc[i, 'wacc'] / 100)^e)+
+      fcff_proj[i,] / (1+(wacc[i+1, 'wacc'] / 100)^(e+1))+
+      fcff_proj[i,] / (1+(wacc[i+2, 'wacc'] / 100)^(e+2))+
+      val_perpet[nrow(val_perpet),] / (1+(wacc[i-3, 'wacc'] / 100)^(e+3))
+    fcd_proj = rbind(fcd_proj, fcd_projetado)
+  }
+  
+}
+
+quant_acoes = as.numeric(c('122000000',
+                           '124000000',
+                           '125000000',
+                           '127000000',
+                           '640000000',
+                           '642000000',
+                           '713000000',
+                           '720000000',
+                           '795000000',
+                           '796000000',
+                           '898000000',
+                           '990000000',
+                           '970384841'))%>%
+  as.data.frame()%>%
+  dplyr::rename(quant_acoes = '.')
+
+fcd_proj = fcd_proj%>%
+  cbind(quant_acoes)
+
+for(i in 1:nrow(fcd_proj)){
+  if(i == 1){
+    eq_value_projetado = fcd_proj[i,][[1]] / fcd_proj[i, 'quant_acoes'][[1]]
+    eq_value_proj = eq_value_projetado
+  } else {
+    eq_value_projetado = fcd_proj[i,][[1]] / fcd_proj[i, 'quant_acoes'][[1]]
+    eq_value_proj = rbind(eq_value_proj, eq_value_projetado)
+  }
+  
+}
+
+indexes = c('496', '741', '989', '1237', '1483', '1732', '1986', '2232', '2480', '2728', '2975', '3225')
+
+cotacao_lren = st%>%
+  as.data.frame()%>%
+  dplyr::select(Date, LREN3.SA.Adjusted)
+
+cotacao_lren = cotacao_lren%>%
+  dplyr::filter(zoo::index(cotacao_lren) %in% indexes)
+
+val_estim = cbind(cotacao_lren, eq_value_proj)
+
+val_estim$Date = as.Date(val_estim$Date)
+
+val_estim%>%
+  dplyr::mutate(cotacao_lren_indice = LREN3.SA.Adjusted / LREN3.SA.Adjusted[1], 
+                val_modelo_indice = eq_value_proj / eq_value_proj[1])%>%
+  ggplot(aes(x = Date))+
+  geom_line(mapping = aes(y = cotacao_lren_indice, colour = 'Cotação Lojas Renner'))+
+  geom_line(mapping = aes(y = val_modelo_indice, colour = 'Valor Estimado pelo 
+                          Modelo'))+
+  scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(title='Performance Passada do Modelo', subtitle='Lojas Renner vs Valor 
+       Estimado pelo Modelo -  Valores em Número-Índice',
+       x = '', y = '', caption = 'Fonte: CVM')
+
+
+dfp_lren_receita_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Receita de Venda de Bens e/ou Serviços')%>%
+  dplyr::select(DT_REFER, VL_CONTA)%>%
+  dplyr::rename(Data = DT_REFER, Receita = VL_CONTA)
+
+dfp_lren_custos_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Custo dos Bens e/ou Serviços Vendidos')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(Custos = VL_CONTA)
+
+dfp_lren_ebitda_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Resultado Bruto')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(ebitda = VL_CONTA)
+
+dfp_lren_despoper_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Despesas/Receitas Operacionais')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(despoper = VL_CONTA)
+
+dfp_lren_despvend_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Despesas com Vendas')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(despvend = VL_CONTA)
+
+dfp_lren_despadm_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Despesas Gerais e Administrativas')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(despadm = VL_CONTA)
+
+dfp_lren_loper_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Resultado Antes do Resultado Financeiro e dos Tributos')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(loper = VL_CONTA)
+
+dfp_lren_resfin_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Resultado Financeiro')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(resfin = VL_CONTA)
+
+dfp_lren_ir_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Imposto de Renda e Contribuição Social sobre o Lucro')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(ir = VL_CONTA)
+
+dfp_lren_ll_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'Lucro/Prejuízo Consolidado do Período')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(ll = VL_CONTA)
+
+dfp_lren_lpa_1 = dre_lren_1%>%
+  dplyr::filter(DS_CONTA == 'ON')%>%
+  dplyr::select(VL_CONTA)%>%
+  dplyr::rename(lpa = VL_CONTA)
+
+dfp_lren_lpa_1 = dfp_lren_lpa_1%>%
+  dplyr::filter(zoo::index(dfp_lren_lpa_1) %% 2 == 0)
+
+pib = ipeadatar::ipeadata(code = 'BM_PIBUSDCM')%>%
+  filter(date > '2009-12-31')%>%
+  dplyr::rename(pib = value)%>%
+  dplyr::select(pib)
+
+data = cbind(dfp_lren_receita_1, 
+             dfp_lren_custos_1, 
+             dfp_lren_ebitda_1, 
+             dfp_lren_despoper_1, 
+             dfp_lren_despvend_1, 
+             dfp_lren_despadm_1,
+             dfp_lren_loper_1,
+             dfp_lren_resfin_1,
+             dfp_lren_ir_1,
+             dfp_lren_ll_1,
+             dfp_lren_lpa_1)%>%
+   dplyr::mutate(receita_indice = Receita / Receita[1],
+                custos_indice = Custos / Custos[1],
+                ebitda_indice = ebitda / ebitda[1],
+                despoper_indice = despoper / despoper[1],
+                despvend_indice = despvend / despvend[1],
+                despadm_indice = despadm / despadm[1],
+                loper_indice = loper / loper[1],
+                resfin_indice = resfin / resfin[1],
+                ir_indice = ir / ir[1],
+                ll_indice = ll / ll[1],
+                lpa_indice = lpa / lpa[1])
+ 
+data%>%
+  ggplot(aes(x = Data))+
+  geom_line(mapping = aes(y = receita_indice, colour = 'Receita de Bens e Serviços'))+
+  geom_line(mapping = aes(y = custos_indice, colour = 'Custos de Bens e Serviços'))+
+  geom_line(mapping = aes(y = ebitda_indice, colour = 'Resultado Bruto'))+
+  geom_line(mapping = aes(y = loper_indice, colour = 'Lucro Operacional'))+
+  geom_line(mapping = aes(y = ll_indice, colour = 'Lucro Líquido'))+
+  scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(title = 'Lojas Renner: Dados Financeiros', 
+       subtitle = 'Valores em Número Índice', 
+       x = '', y = '', 
+       caption = 'Fonte: CVM')
+ 
+```
