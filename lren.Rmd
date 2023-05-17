@@ -1,5 +1,5 @@
 ---
-title: "Análise sobre as ações da Lojas Renner (LREN3)"
+title: "Analysis of the Lojas Renner stock (LREN3)"
 author: 
  
 output: 
@@ -212,22 +212,22 @@ g1=
         )%>%
       ggplot(aes(x = date))+
       geom_line(mapping = aes(y = vendas_indice, 
-                          colour = 'Vendas do Varejo (Dessazonalizadas)'))+
+                          colour = 'Retail Income (Dessazonalizadas)'))+
       
       geom_line(mapping = aes(y = massa_sal_indice,
-                              colour = 'Massa Salarial'))+
+                              colour = 'Salary Mass'))+
       
       geom_line(mapping = aes(y = desemprego_indice, 
-                          colour = 'Taxa de Desemprego'))+
+                          colour = 'Unemployment Rate'))+
       geom_line(mapping = aes(y = op_credito_indice, 
-                          colour = 'Total de Concessões de Crédito'))+
+                          colour = 'Total credit concessions'))+
       scale_x_date(breaks = date_breaks('4 months'), labels = date_format('%b%Y'))+
       scale_y_continuous(breaks = seq(0.2,3,0.1))+
       theme_classic()+
       theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 0.5))+
-      labs(title = 'Drivers de Crescimento Comércio Varejista', 
-      subtitle = 'Valores em Número-Índice', x = '', y = '', 
-      caption = 'Fonte: IpeaData')
+      labs(title = 'Growth Drivers the Retail Sector', 
+      subtitle = 'Values in Index-Number', x = '', y = '', 
+      caption = 'Source: IpeaData')
 )
 #dadosres$data=lubridate::as_date(dadosres$data)
 
@@ -240,41 +240,40 @@ g2=
                     igpm_indice = igpm / igpm[1],
                     pib_indice = pib / pib[1])%>%
       ggplot(aes(x = dadosres$data))+
-      geom_line(mapping = aes(y=lbruto_indice, colour = 'Lucro Bruto'))+
-      geom_line(mapping = aes(y=lliq_indice, colour = 'Lucro Líquido'))+
+      geom_line(mapping = aes(y=lbruto_indice, colour = 'Gross Profit'))+
+      geom_line(mapping = aes(y=lliq_indice, colour = 'Net Profit'))+
       geom_line(mapping = aes(y=ipca_indice, colour = 'IPCA'))+
       geom_line(mapping = aes(y=igpm_indice, colour = 'IGP-M'))+
-      geom_line(mapping = aes(y=pib_indice, colour = 'Produto Interno Bruto'))+
+      geom_line(mapping = aes(y=pib_indice, colour = 'Gross Domestic Product (GDP)'))+
       theme_classic()+
       scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
       theme(axis.text.x = element_text(angle = 45, hjust = 1), 
           plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5))+
-      labs(title = 'Evolução dos Resultados da Companhia',
-      subtitle = 'Valores em Número-índice',
-      caption = 'Fonte: Banco Central, CVM & IpeaData')
+      labs(title = 'Evolution of the companiy's results',
+      subtitle = 'Values in Index-Number',
+      caption = 'Fonte: Central Bank of Brazil, CVM & IpeaData')
 )
 
 gridExtra::grid.arrange(g1,g2,nrow=2,ncol=1)
 
 ```
 
-Em um análise de primeiro estágio, pode-se observar a falta de coincidência entre 
-os movimentos da massa salarial e concessões de crédito, que passaram a crescer 
-fortemente a partir de abr/22 e de dez/20, respectivamente, da taxa de desemprego, 
-que tem diminuído constantemente na última década,e do volume de vendas no comércio 
-varejista, que permaneceu estacioário nesse período.
-Esse fato sugere a possibilidade de o comércio varejista estar sendo contido por 
-outros fatores além do crescimento da massa salarial, ou até mesmo uma redução da 
-propensão marginal a consumir nesse segmento.Os Resultados Bruto e Operacional da
-companhia, no período observado, não parecem ter apresentado qualquer associação
-significativa com os índices de preços considerados.
+In a first stage analysis, it is observed a lack of coincidence between
+movements in wages and credit concessions, which began to grow
+strongly from Apr/22 and Dec/20, respectively, on the unemployment rate,
+which has steadily declined over the last decade, and the volume of sales in the trade
+retained, which is stationary in that period.
+This fact suggests the possibility that retail trade is being content by
+factors other than growth in the wage bill, or even a reduction in
+marginal propensity to consume in this segment. The gross and operational profit of the
+company, in the observed period, did not seem to have presented any association
+significant with accepted price indices.
  
-A Lojas Renner S.A, maior varejista de moda no Brasil, é um ecossistema de moda 
-e lifestyle que distribui seus produtos através de canais on-line e de mais de
-600 lojas no Brasil, Argentina e Uruguai.Fundada em 1965, hoje é líder no varejo
-de moda onichannel no Brasil.
-
+Lojas Renner S.A, the largest fashion retailer in Brazil, is a fashion ecosystem
+and lifestyle that distributes its products through online channels and more than
+600 stores in Brazil, Argentina and Uruguay. Founded in 1965, today it is a leader in retail
+of omnichannel fashion in Brazil.
 ```{r, echo=T, eval=T, results='asis', fig.width=8, fig.height=4, fig.align='center', out.width="1\\linewidth", warning=FALSE, message=FALSE, size='small'}
 
 compos_DRE = dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
@@ -301,9 +300,9 @@ compos_DRE%>%
         legend.title = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1))+
   scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
-  labs(title = 'Evolução da Composição do Demonstrativo de Resultado da Companhia', 
-       subtitle = 'R$ Milhões', x = '', y = '',
-       caption = 'Fonte: CVM')
+  labs(title = 'Evolution of the composition of the company's income statement', 
+       subtitle = 'R$ Millions', x = '', y = '',
+       caption = 'Source: CVM')
 
 dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
   as.data.frame()%>%
@@ -318,9 +317,9 @@ dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
         legend.title = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1))+
   scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
-  labs(title = 'Evolução da Composição da Receita da Companhia', 
-       x = '', y = '', subtitle = 'R$ Milhões',
-       caption = 'Fonte: CVM')
+  labs(title = 'Evolution of the composition of the company's revenue', 
+       x = '', y = '', subtitle = 'R$ Millions',
+       caption = 'Source: CVM')
 
 pib = ipeadatar::ipeadata(code = 'BM12_PIB12')%>%
   dplyr::select(date, value)%>%
@@ -384,8 +383,8 @@ dt%>%
   theme_classic()+
   scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  labs(title = 'Crescimento Econômico, Inflação e Resultados da Companhia',
-       x = '', y = '', subtitle = 'R$ Mil', caption = 'Fonte: CVM & Ibge')
+  labs(title = 'Economic Growth, Inflation and the Company Results',
+       x = '', y = '', subtitle = 'R$ Thousands', caption = 'Source: CVM & Ibge')
   
 dre_lren_1 = dfp_lren_1$`DF Consolidado - Demonstração do Resultado`%>%
   as.data.frame()
@@ -834,9 +833,9 @@ val_estim%>%
   scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  labs(title='Performance Passada do Modelo', subtitle='Lojas Renner vs Valor 
-       Estimado pelo Modelo -  Valores em Número-Índice',
-       x = '', y = '', caption = 'Fonte: CVM')
+  labs(title='Past Performance of the Valuation Model', subtitle='Lojas Renner vs Projected value 
+       of the company -  values in index-number',
+       x = '', y = '', caption = 'Source: CVM')
 
 
 dfp_lren_receita_1 = dre_lren_1%>%
@@ -927,17 +926,17 @@ data = cbind(dfp_lren_receita_1,
  
 data%>%
   ggplot(aes(x = Data))+
-  geom_line(mapping = aes(y = receita_indice, colour = 'Receita de Bens e Serviços'))+
-  geom_line(mapping = aes(y = custos_indice, colour = 'Custos de Bens e Serviços'))+
-  geom_line(mapping = aes(y = ebitda_indice, colour = 'Resultado Bruto'))+
-  geom_line(mapping = aes(y = loper_indice, colour = 'Lucro Operacional'))+
-  geom_line(mapping = aes(y = ll_indice, colour = 'Lucro Líquido'))+
+  geom_line(mapping = aes(y = receita_indice, colour = 'Revenue from goods and services'))+
+  geom_line(mapping = aes(y = custos_indice, colour = 'Costs of goods and services'))+
+  geom_line(mapping = aes(y = ebitda_indice, colour = 'Gross Profit'))+
+  geom_line(mapping = aes(y = loper_indice, colour = 'Operational Profit'))+
+  geom_line(mapping = aes(y = ll_indice, colour = 'Net Profit'))+
   scale_x_date(breaks = date_breaks('1 year'), labels = date_format('%Y'))+
   theme_classic()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  labs(title = 'Lojas Renner: Dados Financeiros', 
-       subtitle = 'Valores em Número Índice', 
+  labs(title = 'Lojas Renner: Financial Data', 
+       subtitle = 'Values in index-number', 
        x = '', y = '', 
-       caption = 'Fonte: CVM')
+       caption = 'Source: CVM')
  
 ```
