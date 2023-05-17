@@ -1,6 +1,6 @@
 ---
 title: "Infection and Mortality Rates of CoronaVirus Disease"
-author: "Arthur Ramos Garcia, Economist and Software Engineer"
+author: "Arthur Ramos Garcia, Economist"
 date: "2023-04-28" 
 output: 
   pdf_document:
