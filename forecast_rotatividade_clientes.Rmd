@@ -1,0 +1,269 @@
+
+---
+  title: "Previsao de Churn com Regressão Logística"
+author: "Arthur Ramos Garcia"
+date: '2022-07-06'
+output:
+  pdf_document:
+  latex_engine: xelatex
+---
+  
+  ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+O presente relatório tem como objetivo rodar uma regressão logística para previsão de perda ou não de um cliente, expressa pela variável 'churn'.Quando resulta em 'sim', o cliente foi perdido, quando resulta em 'não', o cliente não foi perdido.Os dados foram extraídos de um base de clientes do setor de telecomunicações disponível no site da IBM.
+
+```{r}
+library(data.table)
+churn = data.table::fread('C:/Users/Arthur/Desktop/dados.csv')
+str(churn)
+
+```
+
+Primeiro é necessário verificar se a base de dados contém valores faltantes.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+sapply(churn, function(x) sum(is.na(x)))
+
+```
+
+Agora retiraremos todos os valores faltantes ou 'NA'(Not Available)
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+library(rlang)
+library(stats)
+
+churn = churn[complete.cases(churn)]
+
+```
+
+Nas colunas 10 a 15 da base de dados, existem observações que constam como 'No internet Service'.Precisamos substituí-las por 'No', para termos apenas valores 'Yes' ou 'No'.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+library(plyr)
+library(magrittr)
+
+churn = churn%>%
+  as.data.frame()
+
+colunas = c(10:15)
+
+for(i in 1:ncol(churn[,colunas])){
+  churn[,colunas][,i] = as.factor(mapvalues(churn[,colunas][,i], from = c('No internet service'), to = c('No')))
+  
+}
+
+```
+
+Assim, temos todos os valores faltantes removidos.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+sapply(churn, function(x) sum(is.na(x)))
+
+```
+
+Agora transformamos o vetor 'churn' em fator.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+churn$Churn = churn$Churn %>%
+  as.factor()
+
+```
+
+Agora trocamos os valores da coluna 'Multiple Lines' que constam como 'No phone service' para 'No'.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+churn$MultipleLines = as.factor(mapvalues(churn$MultipleLines, from = c('No phone service'), to = c('No')))
+
+```
+
+A posse (tenure) mínima de uma linha nessa empresa é de um mês e a máxima de é de 72 meses.
+Nós podemos agrupar essa posse em cinco categorias: “0–12 Month,” “12–24 Month,” “24–48
+Months,” “48–60 Month” e “> 60 Month.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+group_tenure = function(tenure){
+  if(tenure >= 0 & tenure <= 12){
+    return('0-12 Month')
+  }else if(tenure > 12 & tenure <= 24) {
+    return('12-24 Month')
+  }else if(tenure > 24 & tenure <= 48) {
+    return('24-48 Month')
+  }else if(tenure > 48 & tenure <= 60) {
+    return('48-60 Month')
+  }else if(tenure > 60) {
+    return('> 60 Month')
+  }
+  
+}
+
+#Agora aplicamos a função 'group_tenure' sobre o vetor 'tenure':
+
+churn$tenure_group = sapply(churn$tenure, group_tenure)
+
+churn$tenure_group <- as.factor(churn$tenure_group)
+
+```
+
+Agora transformamos os valores númericos(1 e 0) do vetor 'Senior Citizen' para 'Yes' ou 'No', respectivamente.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+churn$SeniorCitizen = as.factor(plyr::mapvalues(churn$SeniorCitizen, from = c('0', '1'), to = c('No', 'Yes')))
+
+```
+
+Por fim, removemos as colunas que não iremos utilizar
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+churn$customerID = NULL
+churn$tenure = NULL
+
+```
+
+Agora criamos uma matriz de correlação com as variáveis numéricas do nosso dataframe.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+library(corrplot)
+
+numeric.var = sapply(churn, is.numeric)
+corr.matrix = round(cor(churn[,numeric.var]), 2)
+
+corrplot(corr.matrix, main = 'Correlation Plot for Numeric Variables', method = 'number')
+
+```
+
+As variáveis Total Montly Charges e Total Charges são colineares na amostra analisada, então utilizaremos apenas uma delas.Assim, retiramos a variável 'Total Charges'.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+churn$TotalCharges = NULL
+
+```
+
+Agora, geramos os gráficos de barras com a distribuição das variáveis entre cada uma das categorias.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+library(ggplot2)
+library(gridExtra)
+
+p1 <- ggplot(churn, aes(x=gender)) + ggtitle("Gender") + xlab("Gender") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p2 <- ggplot(churn, aes(x=SeniorCitizen)) + ggtitle("Senior Citizen") + xlab("Senior Citizen") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p3 <- ggplot(churn, aes(x=Partner)) + ggtitle("Partner") + xlab("Partner") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p4 <- ggplot(churn, aes(x=Dependents)) + ggtitle("Dependents") + xlab("Dependents") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+grid.arrange(p1, p2, p3, p4, ncol=2)
+
+p5 <- ggplot(churn, aes(x=PhoneService)) + ggtitle("Phone Service") + xlab("Phone Service") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p6 <- ggplot(churn, aes(x=MultipleLines)) + ggtitle("Multiple Lines") + xlab("Multiple Lines") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p7 <- ggplot(churn, aes(x=InternetService)) + ggtitle("Internet Service") + xlab("Internet Service") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p8 <- ggplot(churn, aes(x=OnlineSecurity)) + ggtitle("Online Security") + xlab("Online Security") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+grid.arrange(p5, p6, p7, p8, ncol=2)
+p9 <- ggplot(churn, aes(x=OnlineBackup)) + ggtitle("Online Backup") + xlab("Online Backup") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p10 <- ggplot(churn, aes(x=DeviceProtection)) + ggtitle("Device Protection") + xlab("Device Protection") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p11 <- ggplot(churn, aes(x=TechSupport)) + ggtitle("Tech Support") + xlab("Tech Support") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p12 <- ggplot(churn, aes(x=StreamingTV)) + ggtitle("Streaming TV") + xlab("Streaming TV") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+grid.arrange(p9, p10, p11, p12, ncol=2)
+p13 <- ggplot(churn, aes(x=StreamingMovies)) + ggtitle("Streaming Movies") + xlab("Streaming Movies") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p14 <- ggplot(churn, aes(x=Contract)) + ggtitle("Contract") + xlab("Contract") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p15 <- ggplot(churn, aes(x=PaperlessBilling)) + ggtitle("Paperless Billing") + xlab("Paperless Billing") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p16 <- ggplot(churn, aes(x=PaymentMethod)) + ggtitle("Payment Method") + xlab("Payment Method") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p17 <- ggplot(churn, aes(x=tenure_group)) + ggtitle("Tenure Group") + xlab("Tenure Group") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+grid.arrange(p13, p14, p15, p16, p17, ncol=2)
+
+```
+Agora dividiremos o conjunto de dados entre uma amostra de treino e outra de teste.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+intrain = caret::createDataPartition(churn$Churn, p = 0.7, list = FALSE)
+
+training = churn[intrain, ]
+testing = churn[-intrain, ]
+
+
+```
+
+Agora estimamos o modelo logístico.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+library(stargazer)
+
+LogModel = glm(Churn~., family = binomial(link = 'logit'), data = training)
+stargazer::stargazer(LogModel, font.size = 'tiny', title = 'Regressão Logística', header = FALSE)
+
+```
+
+A tabela 1 ilustra o modelo. As três variáveis mais relevantes para explicar Churn são: Contract,
+Paperless Billing e tenure group. A seguir, analisando a tabela de desvio, podemos ver a queda
+no desvio ao adicionar cada variável uma de cada vez. Adicionar InternetService, Contract e
+tenure_group reduz significativamente o desvio residual. As outras variáveis, como PaymentMethod e Dependents, parecem melhorar menos o modelo, embora todos tenham p-valores baixos
+
+```{r, echo=TRUE, fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+library(stats)
+
+anova(LogModel, test = 'Chisq')
+
+```
+
+
+```{r, echo=TRUE, fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+library(stats)
+
+anova(LogModel, test = 'Chisq')
+
+```
+
+Agora verificaremos a acurácia do modelo.
+
+```{r, echo=TRUE, results='asis', fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+testing$Churn = as.character(testing$Churn)
+testing$Churn[testing$Churn == 'No'] = '0'
+testing$Churn[testing$Churn == 'Yes'] = '1'
+fitted.results = predict(LogModel, newdata = testing, type = 'response')
+fitted.results = ifelse(fitted.results > 0.5, 1, 0)
+misClassificError = mean(fitted.results != testing$Churn)
+print(paste('Logistic Regression Accuracy', 1 - misClassificError))
+
+
+```
+
+Uma das medidas de desempenho interessantes na regressão logística é a Odds Ratio. Basicamente, odds ratios mede a probabilidade de ocorrência de um evento.
+
+```{r, echo=TRUE, fig.width=10, fig.height=5, fig.align='center', out.width=".95\\linewidth", warning=FALSE, message=FALSE, error=FALSE}
+
+exp(cbind(OR = coef(LogModel), confint(LogModel)))
+
+```
+
